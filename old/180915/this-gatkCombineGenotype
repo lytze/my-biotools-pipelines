@@ -1,0 +1,30 @@
+#!/bin/bash
+
+DH=$1
+FO=$2
+LI=""
+LO=logs_$FO
+
+if [ ! -e $LO ]; then
+    mkdir $LO
+fi &&
+for i in `cat $DH`
+do
+    LI=$LI"-V data/$i.g.vcf "
+done &&
+echo "[ `date +%H:%M:%S` $FO ] Combine GVCFs" | tee $LO/run.log &&
+gatk CombineGVCFs \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    $LI \
+    -O $FO.g.vcf.gz \
+    -D $THIS_GENOME_FI/s_pombe_v2.vcf &&
+echo "[ `date +%H:%M:%S` $FO ] Make joint genotyping" | tee $LO/run.log &&
+gatk --java-options "-Xmx4g" GenotypeGVCFs \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -V $FO.g.vcf.gz \
+    -O $FO.vcf.gz \
+    -D $THIS_GENOME_FI/s_pombe_v2.vcf \
+    --sample-ploidy 1 \
+    --standard-min-confidence-threshold-for-calling 25 &&
+echo "[ `date +%H:%M:%S` $FO ] Combined genotyping finished" | tee -a $LO/run.log ||
+echo "[ `date +%H:%M:%S` $FO ] An error has occur" | tee -a $LO/run.log

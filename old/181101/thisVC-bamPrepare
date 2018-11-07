@@ -1,0 +1,35 @@
+#!/bin/bash
+set -e
+
+FB=$1   # BAM FILE PATH/NAME
+FO=$2   # FILE DISCRIMINATOR / OUTPUT PREFIX
+
+if [[ ! -e logs_$FO ]] ; then
+    mkdir logs_$FO
+fi
+echo "[ `date +%H:%M:%S` bamPrepare $FO ] Start" | tee logs_$FO/run.log
+echo "[ `date +%H:%M:%S` bamPrepare $FO ] Marking duplicates" | tee logs_$FO/run.log
+gatk MarkDuplicates \
+    -I $FB \
+    -O $FO.rd.bam \
+    -M /dev/null \
+    --READ_NAME_REGEX null \
+    -AS true --REMOVE_DUPLICATES true \
+    > logs_$FO/gatkMarkDuplicates.log 2>&1
+echo "[ `date +%H:%M:%S` bamPrepare $FO ] Recalibrating base quality" | tee -a logs_$FO/run.log
+gatk BaseRecalibrator \
+    -I $FO.rd.bam \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -known-sites $THIS_GENOME_FI/s_pombe_v2.vcf \
+    -O $FO.recal \
+    > logs_$FO/gatkBaseRecalibrator.log 2>&1
+echo "[ `date +%H:%M:%S` bamPrepare $FO ] Applying BQSR" | tee -a logs_$FO/run.log
+gatk ApplyBQSR \
+    -I $FO.rd.bam \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -bqsr $FO.recal \
+    -O $FO.ready.bam \
+    > logs_$FO/gatkApplyBQSR.log 2>&1
+echo "[ `date +%H:%M:%S` bamPrepare $FO ] Clean directory"
+rm $FO.rd.bam $FO.recal
+echo "[ `date +%H:%M:%S` bamPrepare $FO ] Finish" | tee -a logs_$FO/run.log

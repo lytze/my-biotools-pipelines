@@ -1,0 +1,33 @@
+#!/bin/bash
+set -e
+
+INFI=$1
+BASE=`basename $INFI .vcf`
+
+gatk VariantFiltration \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -V $INFI \
+    -O $BASE.filter.vcf \
+    --filter-expression "QD < 20.0" \
+    --filter-name "cut_artifact_SNP_due_to_homology"
+
+vep --cache --species schizosaccharomyces_pombe --cache_version 40 --offline \
+    --appris --biotype --pick --symbol --tsl --distance 100 \
+    -i $BASE.filter.vcf --vcf -o $BASE.ann.vcf
+
+gatk VariantsToTable \
+    -V $BASE.ann.vcf \
+    -F CHROM -F POS -F TYPE -F EVENTLENGTH -F VAR -F QD \
+    -F CSQ -F REF -F ALT -GF GT \
+    -O $BASE.ann.tsv
+
+HEAD="CHROM\tPOS\tEVENT\tLENGTH\t#VAR\tQUAL_OF_DEPTH\tEFFECT\tIMPACT\tGENE_NAME\tSEQ_TYPE\tPOS_PROTEIN\tAMINO_ACID\tCODON\tDIST_TO_GENE\tREF\tALT\t"
+HEAD=$HEAD`head -1 $BASE.ann.tsv | cut -f10- --output-delimiter="\t" | sed "s/GT/GENOTYPE/g"`
+echo -e $HEAD > $BASE.modified.tsv
+SEP=$'|'
+TAB=$'\t'
+tail -n +2 $BASE.ann.tsv |
+    cut -d'|' -f-3,4,6,8,15,16,17,19,25 |
+    sed "s/${SEP}/${TAB}/g" |
+    sed "s/&[a-z_]*//g" |
+    cut -f-6,8-10,12-16,18-  >> $BASE.modified.tsv

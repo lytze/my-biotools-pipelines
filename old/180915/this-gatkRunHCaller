@@ -1,0 +1,36 @@
+#!/bin/bash
+
+FB=$1
+FO=$2
+LO=logs_$2
+TY=$3
+
+
+if [ ! -e $LO ]; then
+    mkdir $LO
+fi &&
+case $TY in
+    G | g | gvcf | GVCF )
+        echo "[ `date +%H:%M:%S` $FO ] Using GVCF mode" | tee $LO/run.log &&
+        ERC="-ERC GVCF" &&
+        FOO=$FO.g.vcf
+        ;;
+    *)
+        echo "[ `date +%H:%M:%S` $FO ] Using VCF mode" | tee $LO/run.log &&
+        ERC="" &&
+        FOO=$FO.vcf
+        ;;
+esac &&
+echo "[ `date +%H:%M:%S` ] Calling variants $FO " | tee $LO/run.log &&
+gatk HaplotypeCaller \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -I $FB \
+    -D $THIS_GENOME_FI/s_pombe_v2.vcf \
+    -O $FOO $ERC\
+    -bamout $FO.accept.bam \
+    --standard-min-confidence-threshold-for-calling 25 \
+    --sample-ploidy 1 \
+    --min-base-quality-score 20 \
+    >> $LO/gatkHaplotypeCaller.log 2>&1 &&
+echo "[ `date +%H:%M:%S` $FO ] Variant calling finished" | tee -a $LO/run.log ||
+echo "[ `date +%H:%M:%S` $FO ] An error has occur" | tee -a $LO/run.log

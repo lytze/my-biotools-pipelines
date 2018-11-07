@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+
+if [ $# -eq 0 ] ; then
+    echo "Usage: local-pileChIPseq <input directory>"
+fi
+
+DI=$1
+if [[ -e mapped_read_count.txt ]] ; then
+    rm mapped_read_count.txt
+fi
+
+ls $DI | while read FN ; do
+    thisCH-makeAlignment $DI/$FN
+done
+
+ls $DI | cut -f1 -d. | while read BN ; do
+    thisCH-countGraph $BN.ready.bam
+done

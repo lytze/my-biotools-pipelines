@@ -1,0 +1,45 @@
+#!/bin/bash
+set -e
+
+FO=$1   # OUTPUT PREFIX
+
+if [[ ! -d bootBQSR ]]
+    then
+    mkdir bootBQSR
+fi
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Boost call variants\033[0m"
+gatk HaplotypeCaller \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -I alignment/$FO.markdup.bam \
+    -O bootBQSR/$FO.pre.vcf \
+    -A FisherStrand -A QualByDepth -A StrandOddsRatio \
+    -AX MappingQualityRankSumTest -AX BaseQualityRankSumTest \
+    -AX InbreedingCoeff -AX ExcessHet -AX ReadPosRankSumTest \
+    -XL $THIS_GENOME_FI/exclude-regions.intervals \
+    --sample-ploidy 1 -stand-call-conf 25 --kmer-size 20 --kmer-size 30 \
+    --native-pair-hmm-threads 4
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Select high quality variants\033[0m"
+gatk VariantFiltration \
+    -V bootBQSR/$FO.pre.vcf \
+    -O bootBQSR/$FO.pre.ft.vcf \
+    -filter "FS > 1.0 || MQ < 55.0 || QD < 25.0 || SOR > 1.5" \
+    --filter-name "BQSRFILTER"
+grep ^#   bootBQSR/$FO.pre.ft.vcf >  bootBQSR/$FO.pre.rm.vcf
+grep PASS bootBQSR/$FO.pre.ft.vcf >> bootBQSR/$FO.pre.rm.vcf
+igvtools index bootBQSR/$FO.pre.rm.vcf
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Generate BQSR table\033[0m"
+gatk BaseRecalibrator \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -I alignment/$FO.markdup.bam \
+    -O bootBQSR/$FO.recal \
+    -XL $THIS_GENOME_FI/exclude-regions.intervals \
+    -known-sites bootBQSR/$FO.pre.rm.vcf
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Apply BQSR\033[0m"
+gatk ApplyBQSR \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -I alignment/$FO.markdup.bam \
+    -O bootBQSR/$FO.ready.bam \
+    -XL $THIS_GENOME_FI/exclude-regions.intervals \
+    -bqsr bootBQSR/$FO.recal

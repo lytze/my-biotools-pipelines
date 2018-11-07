@@ -1,0 +1,90 @@
+#!/bin/bash
+set -e
+
+## HELP MSG
+if [ $# -eq 0 ] || [ $1 = "-h" ] || [ $1 = "--help" ] ; then
+    echo -e \
+"Arguments < formmat: -flag [type] Intro (defalt value) >
+    -p [INT]        Thread number (4)
+    -t [fq|gz]      Input file type (gz)
+    -i [PATH/DIR]   PATH to input data directory (./data)
+    -I [FILE]       PATH to input information list (./input-info)
+    -q              Do variant quality control (FALSE)
+    -h|--help       This friendly help information"
+    exit 0
+fi
+
+## DEFAULT OPTs
+TR=4                 # p = THREAD NUMBER
+FT="gz"              # t = FILE TYPE
+DA="data"            # i = PATH/DATA
+IN="input-info"      # I = INPUT INFO
+QC=FALSE             # q = QUALITY CONTROL
+
+## GET OPTs
+while getopts 'p:t:i:I:q' OPT
+do
+    case $OPT in
+        p)  TR=$OPTARG ;;
+        t)  FT=$OPTARG ;;
+        i)  DA=$OPTARG ;;
+        I)  IN=$OPTARG ;;
+        q)  QC=TRUE ;;
+    esac
+done
+
+## CHECK EXISTENCE of REQUIRED FILES
+DA=`readlink -m $DA`
+if [[ ! -e $DA ]] ; then
+    echo "[ ERROR ] Input data directory <$DA> NOT FOUND"
+    exit 1
+elif [[ ! -d $DA ]] ; then
+    echo "[ ERROR ] Input data directory <$DA> IS NOT A DIRECTORY"
+    exit 1
+fi
+IN=`readlink -m $IN`
+if [[ ! -e $IN ]] ; then
+    echo "[ ERROR ] Input info list <$IN> NOT FOUND"
+    exit 1
+elif [[ ! -f $IN ]] ; then
+    echo "[ ERROR ] Input info list LIST <$IN> IS NOT AN ORDINARY FILE"
+    exit 1
+fi
+
+## MAKE FIFO QUEUE
+mkfifo q.pip && exec 99<> q.pip && rm -f q.pip
+for ((i=0; i<$(($TR/2)); i++))
+do
+    echo >&99
+done
+
+## ALIGN AND RECORD OUTPUT PREFIXS / SAMPLE NAMES
+FO_ALL=""
+iter=1
+for i in `cat input-info` ; do
+    if [[ iter -eq 1 ]] ; then
+        F2=$i
+        iter=2
+    elif [[ iter -eq 2 ]] ; then
+        F1=$i
+        iter=3
+    elif [[ iter -eq 3 ]] ; then
+        FO=$i
+        FO_ALL="$FO_ALL $FO"
+        iter=1
+        thisVC-alignReads $FT $DA/$F1 $DA/$F2 $FO $TR
+    fi
+done
+## REST ANALYSIS RUN IN PARALLEL
+for i in $FO_ALL
+do
+    read -u 99
+    {
+        thisVC-bootBQSR $i ;
+        thisVC-callVariants $i ;
+        if $QC ; then thisVC-variantQC.R $i ; fi ;
+        thisVC-filterVariants $i;
+        echo 1>&99
+    }&
+done
+wait

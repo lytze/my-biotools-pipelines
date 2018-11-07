@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+
+FT=$1   # FILE TYPE
+FQ1=$2  # READ1 FILE PATH/NAME
+FQ2=$3  # READ2 FILE PATH/NAME
+FO=$4   # READ GROUP SAMPLE NAME
+TR=$5   # THREAD NUMBER
+i=1
+while [[ ${FQ1:0:i} = ${FQ2:0:i} ]] ; do i=$((i+1)); done
+i=$((i-1))
+ID=${FQ1:0:i}
+RGI="@RG\tID:$ID\tLB:NONE\tPL:ILLUMINA\tPU:NONE\tSM:$FO"
+
+if [[ ! -d alignment ]]
+    then
+    mkdir alignment
+fi
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Aligning\033[0m"
+case $FT in
+    fq | fastq )
+        bwa mem -t $TR \
+            -M -R $RGI \
+            $THIS_GENOME_FI/s_pombe_v2.fa \
+            $FQ1 $FQ2  ;;
+    gz | fq.gz | fastq.gz )
+        bwa mem -t $TR \
+            -M -R $RGI \
+            $THIS_GENOME_FI/s_pombe_v2.fa \
+            <( gunzip -c $FQ1 ) <( gunzip -c $FQ2 ) ;;
+    * )
+        echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Want file type marked as fq or gz, but not\033[0m"
+        exit 1
+        ;;
+esac |
+gatk SortSam \
+    -I /dev/stdin \
+    -O /dev/stdout \
+    -SO coordinate |
+gatk SamFormatConverter \
+    -I /dev/stdin \
+    -O alignment/$FO.srt.bam.tmp
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Mark duplicates\033[0m"
+if [[ -e alignment/$FO.markdup.bam ]]
+    then
+    gatk MarkDuplicates \
+        -I alignment/$FO.srt.bam.tmp \
+        -O alignment/$FO.markdup.bam.tmp \
+        -M /dev/null \
+        --READ_NAME_REGEX null \
+        -AS true --REMOVE_DUPLICATES true
+    gatk MergeSamFiles \
+        -I alignment/$FO.markdup.bam -I alignment/$FO.markdup.bam.tmp \
+        -O alignment/$FO.markdup.bam.merged
+    rm alignment/$FO.markdup.bam
+    rm alignment/$FO.markdup.bai
+    mv alignment/$FO.markdup.bam.merge alignment/$FO.markdup.bam
+else
+    gatk MarkDuplicates \
+        -I alignment/$FO.srt.bam.tmp \
+        -O alignment/$FO.markdup.bam \
+        -M /dev/null \
+        --READ_NAME_REGEX null \
+        -AS true --REMOVE_DUPLICATES true
+fi
+rm alignment/*.tmp
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Indexing\033[0m"
+gatk BuildBamIndex -I alignment/$FO.markdup.bam 

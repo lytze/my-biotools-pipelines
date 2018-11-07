@@ -1,0 +1,62 @@
+#!/bin/bash
+
+FT=$1
+FQ1=$2
+FQ2=$3
+FO=$4
+LO="logs_$FO"
+if [[ ! -e $LO ]]; then
+    mkdir $LO
+fi &&
+echo "[ `date +%H:%M:%S` $FO ] Pars: FT=$FT FQ1=$FQ1 FQ2=$FQ2 FO=$FO LO=$LO" | tee $LO/run.log &&
+FQH=`gunzip -c $FQ1 | head -1` &&
+RGI="@RG\tID:$FO\tLB:`echo $FQH | cut -f3 -d:`:`echo $FQH | cut -f4 -d:`\t" &&
+RGI=$RGI"PL:ILLUMINA\tPU:NONE\tSM:$FO" &&
+echo -e "[ `date +%H:%M:%S` $FO ] Read Group $RGI"  | tee $LO/run.log &&
+case $FT in
+    fq | fastq )
+        echo "[ `date +%H:%M:%S` $FO ] Making alignment" | tee $LO/run.log &&
+        bwa mem -t 4 -M \
+            -R $RGI \
+            $THIS_GENOME_FI/s_pombe_v2.fa $FQ1 $FQ2 \
+            2> $LO/bwa-mem.log |
+        samtools view -@ 4 -Sb |
+        samtools sort -@ 4 -o $FO.s.bam 2> $LO/samtools-sort.log
+        ;;
+    gz | fq.gz | fastq.gz )
+        echo "[ `date +%H:%M:%S` $FO ] Making alignment" | tee $LO/run.log &&
+        bwa mem -t 3 -M \
+            -R $RGI \
+            $THIS_GENOME_FI/s_pombe_v2.fa \
+            <( gunzip -c $FQ1 ) <( gunzip -c $FQ2 ) \
+            2> $LO/bwa-mem.log |
+        samtools view -@ 4 -Sb |
+        samtools sort -@ 4 -o $FO.s.bam 2> $LO/samtools-sort.log
+        ;;
+    *)
+        echo "[ `date +%H:%M:%S` $FO ] Want file type marked as fq or gz, but not" | tee $LO/run.log
+        exit 1
+        ;;
+esac &&
+echo "[ `date +%H:%M:%S` $FO ] Marking duplicates" | tee -a $LO/run.log &&
+gatk MarkDuplicates \
+    -I $FO.s.bam \
+    -O $FO.s.rd.bam \
+    -M $FO.s.rd.txt \
+    > $LO/gatkMarkDuplicates.log 2>&1 &&
+echo "[ `date +%H:%M:%S` $FO ] Recalibrating base quality" | tee -a $LO/run.log &&
+gatk BaseRecalibrator \
+    -I $FO.s.rd.bam \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -known-sites $THIS_GENOME_FI/s_pombe_v2.vcf \
+    -O $FO.recal \
+    > $LO/gatkBaseRecalibrator.log 2>&1 &&
+echo "[ `date +%H:%M:%S` $FO ] Applying BQSR" | tee -a $LO/run.log &&
+gatk ApplyBQSR \
+    -I $FO.s.rd.bam \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -bqsr $FO.recal \
+    -O $FO.ready.bam \
+    > $LO/gatkApplyBQSR.log 2>&1 &&
+echo "[ `date +%H:%M:%S` $FO ] Data preparation finished" | tee -a $LO/run.log ||
+echo "[ `date +%H:%M:%S` $FO ] An error has occur" | tee -a $LO/run.log

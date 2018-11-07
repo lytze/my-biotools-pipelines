@@ -1,0 +1,42 @@
+#!/bin/bash
+set -e
+
+FT=$1   # FILE TYPE
+FQ1=$2  # READ1 FILE PATH/NAME
+FQ2=$3  # READ2 FILE PATH/NAME
+SM=$4   # READ GROUP SAMPLE NAME
+FO=$5   # OUTPUT PREFIX
+TR=$6   # THREAD NUMBER
+RGI="@RG\tID:$FO\tLB:NONE\tPL:ILLUMINA\tPU:NONE\tSM:$SM"
+
+if [[ ! -e logs_$FO ]] ; then
+    mkdir logs_$FO
+fi
+echo "[ `date +%H:%M:%S` makeAlignment $FO ] Start" | tee logs_$FO/run.log
+echo "[ `date +%H:%M:%S` makeAlignment $FO ] Aligning and Sorting" | tee logs_$FO/run.log
+case $FT in
+    fq | fastq )
+        bwa mem -t $TR \
+            -M -R $RGI \
+            $THIS_GENOME_FI/s_pombe_v2.fa $FQ1 $FQ2 \
+            2> logs_$FO/bwa-mem.log |
+        samtools view -@ $TR -Sb |
+        samtools sort -@ $TR -o $FO.sort.bam 2> logs_$FO/samtools-sort.log
+        ;;
+    gz | fq.gz | fastq.gz )
+        bwa mem -t $TR \
+            -M -R $RGI \
+            $THIS_GENOME_FI/s_pombe_v2.fa \
+            <( gunzip -c $FQ1 ) <( gunzip -c $FQ2 ) \
+            2> logs_$FO/bwa-mem.log |
+        samtools view -@ $TR -Sb |
+        samtools sort -@ $TR -o $FO.sort.bam 2> logs_$FO/samtools-sort.log
+        ;;
+    *)
+        echo "[ `date +%H:%M:%S` makeAlignment $FO ] Want file type marked as fq or gz, but not" | tee -a logs_$FO/run.log
+        exit 1
+        ;;
+esac
+echo "[ `date +%H:%M:%S` makeAlignment $FO ] Indexing" | tee logs_$FO/run.log
+samtools index -@ $TR $FO.sort.bam
+echo "[ `date +%H:%M:%S` makeAlignment $FO ] Finish" | tee -a logs_$FO/run.log

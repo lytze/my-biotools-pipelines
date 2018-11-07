@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+FO=$1   # OUTPUT PREFIX
+
+if [[ ! -d results ]]
+    then
+    mkdir results
+fi
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Filter indels\033[0m"
+gatk VariantFiltration \
+    -V variantCall/$FO.indel.vcf \
+    -O results/$FO.indel.vcf \
+    -filter "FS > 1.0 || MQ < 50.0 || QD < 20.0 || SOR > 2.0" \
+    --filter-name "INDELFILTER"
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Filter SNPs\033[0m"
+gatk VariantFiltration \
+    -V variantCall/$FO.snp.vcf \
+    -O results/$FO.snp.vcf \
+    -filter "FS > 1.0 || MQ < 57.0 || QD < 25.0 || SOR > 2.0" \
+    --filter-name "SNPFILTER"

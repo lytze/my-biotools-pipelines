@@ -1,0 +1,33 @@
+#!/bin/bash
+set -e
+
+DD=$1
+DH=$2
+FO=$3
+LI=""
+
+if [[ ! -e logs_$FO ]] ; then
+    mkdir logs_$FO
+fi
+echo "[ `date +%H:%M:%S` combineGenotype $FO ] Start" | tee logs_$FO/run.log
+for i in `cat $DH`
+do
+    LI=$LI"-V $DD/$i.g.vcf "
+done
+echo "[ `date +%H:%M:%S` combineGenotype $FO ] Combine GVCFs" | tee -a logs_$FO/run.log
+gatk CombineGVCFs \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    $LI \
+    -O $FO.g.vcf.gz \
+    -A FisherStrand -A QualByDepth \
+    >> logs_$FO/CombineGVCFs.log 2>&1
+echo "[ `date +%H:%M:%S` combineGenotype $FO ] Make joint genotyping" | tee -a logs_$FO/run.log
+gatk --java-options "-Xmx4g" GenotypeGVCFs \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -V $FO.g.vcf.gz \
+    -O $FO.vcf.gz \
+    -A FisherStrand -A QualByDepth \
+    --sample-ploidy 1 \
+    --standard-min-confidence-threshold-for-calling 25 \
+    >> logs_$FO/GenotypeGVCFs.log 2>&1
+echo "[ `date +%H:%M:%S` combineGenotype $FO ] Finish" | tee -a logs_$FO/run.log

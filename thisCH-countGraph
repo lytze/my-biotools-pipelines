@@ -1,0 +1,18 @@
+#!/bin/bash
+set -e
+FN=$1
+BN=`basename $FN | cut -f1 -d.`
+
+echo -e "\033[1m[ `date +%H:%M:%S` $BN ]\033[0m Discard reads"
+macs2 randsample -i $FN \
+    --seed 1 -n `sort -n mapped_read_count.txt | head -1` \
+    -o $BN.unif.bed \
+    --verbose 0
+
+echo -e "\033[1m[ `date +%H:%M:%S` $BN ]\033[0m Pile up to BEDGRAPH"
+macs2 pileup -i $BN.unif.bed \
+    -f BED --extsize 147 \
+    --outdir results -o $BN.bdg \
+    --verbose 0
+
+echo -e "\033[1m[ `date +%H:%M:%S` $BN ]\033[0m Finished"

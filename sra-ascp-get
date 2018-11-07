@@ -1,0 +1,6 @@
+SRA=$1
+~/Applications/Aspera\ Connect.app/Contents/Resources/ascp \
+    -i ~/Applications/Aspera\ Connect.app/Contents/Resources/asperaweb_id_dsa.openssh \
+    -T -l 200m -v -k 1\
+    anonftp@ftp-private.ncbi.nlm.nih.gov:/sra/sra-instant/reads/ByRun/sra/"${SRA:0:3}"/"${SRA:0:6}"/"$SRA"/"$SRA".sra \
+    ./

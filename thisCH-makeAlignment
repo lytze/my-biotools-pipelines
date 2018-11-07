@@ -1,0 +1,16 @@
+#!/bin/bash
+set -e
+FN=$1
+BN=`basename $FN | cut -f1 -d.`
+
+echo -e "\033[1m[ `date +%H:%M:%S` $BN ]\033[0m Trim, align and remove duplicates"
+fastq_quality_trimmer -t 25 -l 50 -i $FN | \
+    fastx_trimmer -f 1 -l 50 -o /dev/stdout | \
+    bwa mem -t 8 $THIS_GENOME_FI/s_pombe_v2.fa /dev/stdin 2> /dev/null | \
+    samtools view -@ 8 -Sb -F 2052 | \
+    samtools sort -@ 8 -o /dev/stdout 2> /dev/null | \
+    samtools markdup -@ 8 -r /dev/stdin $BN.ready.bam
+
+MR=`samtools view -@ 8 -c $BN.ready.bam`
+echo -e "\033[1m[ `date +%H:%M:%S` $BN ]\033[0m Mapped reads: $MR"
+echo $MR >> mapped_read_count.txt

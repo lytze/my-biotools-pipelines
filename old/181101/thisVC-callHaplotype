@@ -1,0 +1,33 @@
+#!/bin/bash
+set -e
+
+FB=$1
+FO=$2
+TY=$3
+
+if [[ ! -e logs_$FO ]] ; then
+    mkdir logs_$FO
+fi
+echo "[ `date +%H:%M:%S` callHaplotype $FO ] Start" | tee logs_$FO/run.log
+case $TY in
+    G | g | gvcf | GVCF )
+        echo "[ `date +%H:%M:%S` callHaplotype $FO ] Use GVCF mode" | tee -a logs_$FO/run.log
+        ERC="-ERC GVCF"
+        FOO=$FO.g.vcf
+        ;;
+    *)
+        echo "[ `date +%H:%M:%S` callHaplotype $FO ] Use VCF mode" | tee -a logs_$FO/run.log
+        ERC=""
+        FOO=$FO.vcf
+        ;;
+esac
+gatk HaplotypeCaller \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -I $FB \
+    -O $FOO $ERC\
+    -A FisherStrand -A QualByDepth \
+    --standard-min-confidence-threshold-for-calling 25 \
+    --sample-ploidy 1 \
+    --min-base-quality-score 20 \
+    >> logs_$FO/gatkHaplotypeCaller.log 2>&1
+echo "[ `date +%H:%M:%S` callHaplotype $FO ] Finish" | tee -a logs_$FO/run.log

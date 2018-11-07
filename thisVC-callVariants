@@ -1,0 +1,27 @@
+#!/bin/bash
+set -e
+
+FO=$1   # OUTPUT PREFIX
+
+if [[ ! -d variantCall ]]
+    then
+    mkdir variantCall
+fi
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Fetermining variant call\033[0m"
+gatk HaplotypeCaller \
+    -R $THIS_GENOME_FI/s_pombe_v2.fa \
+    -I bootBQSR/$FO.ready.bam \
+    -O variantCall/$FO.vcf \
+    -A FisherStrand -A QualByDepth -A StrandOddsRatio \
+    -AX MappingQualityRankSumTest -AX BaseQualityRankSumTest \
+    -AX InbreedingCoeff -AX ExcessHet -AX ReadPosRankSumTest \
+    -XL $THIS_GENOME_FI/exclude-regions.intervals \
+    --sample-ploidy 1 -stand-call-conf 25 --kmer-size 20 --kmer-size 30 \
+    --native-pair-hmm-threads 4
+
+echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Separate VCF\033[0m"
+gatk SplitVcfs \
+    -I variantCall/$FO.vcf \
+    --INDEL_OUTPUT variantCall/$FO.indel.vcf \
+    --SNP_OUTPUT   variantCall/$FO.snp.vcf
