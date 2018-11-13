@@ -24,4 +24,5 @@ echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Separate VCF\033[0m"
 gatk SplitVcfs \
     -I variantCall/$FO.vcf \
     --INDEL_OUTPUT variantCall/$FO.indel.vcf \
-    --SNP_OUTPUT   variantCall/$FO.snp.vcf
+    --SNP_OUTPUT   variantCall/$FO.snp.vcf \
+    --STRICT false
