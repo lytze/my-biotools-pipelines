@@ -3,9 +3,9 @@ set -e
 
 FO=$1   # OUTPUT PREFIX
 
-if [[ ! -d results ]]
+if [[ ! -e results ]]
     then
-    mkdir results
+    mkdir -p results
 fi
 
 echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Filter indels\033[0m"

@@ -19,7 +19,7 @@ gatk HaplotypeCaller \
     -AX MappingQualityRankSumTest -AX BaseQualityRankSumTest \
     -AX InbreedingCoeff -AX ExcessHet -AX ReadPosRankSumTest \
     -XL $THIS_GENOME_FI/exclude-regions.intervals \
-    --sample-ploidy 1 -stand-call-conf 25 --kmer-size 20 --kmer-size 30 \
+    --sample-ploidy 4 --kmer-size 20 --kmer-size 30 \
     --native-pair-hmm-threads $((TR-1))
 
 echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Separate VCF\033[0m"

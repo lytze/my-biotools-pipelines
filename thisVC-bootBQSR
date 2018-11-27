@@ -2,10 +2,11 @@
 set -e
 
 FO=$1   # OUTPUT PREFIX
+TR=$2   # HMM THREAD NUMBER
 
-if [[ ! -d bootBQSR ]]
+if [[ ! -e bootBQSR ]]
     then
-    mkdir bootBQSR
+    mkdir -p bootBQSR
 fi
 
 echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Boost call variants\033[0m"
@@ -18,7 +19,7 @@ gatk HaplotypeCaller \
     -AX InbreedingCoeff -AX ExcessHet -AX ReadPosRankSumTest \
     -XL $THIS_GENOME_FI/exclude-regions.intervals \
     --sample-ploidy 1 -stand-call-conf 25 --kmer-size 20 --kmer-size 30 \
-    --native-pair-hmm-threads 4
+    --native-pair-hmm-threads $((TR-1))
 echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Select high quality variants\033[0m"
 gatk VariantFiltration \
     -V bootBQSR/$FO.pre.vcf \

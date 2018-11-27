@@ -34,13 +34,13 @@ case $FT in
         exit 1
         ;;
 esac |
-gatk SortSam \
-    -I /dev/stdin \
-    -O /dev/stdout \
-    -SO coordinate |
 gatk SamFormatConverter \
     -I /dev/stdin \
-    -O alignment/$FO.srt.bam.tmp
+    -O /dev/stdout |
+gatk SortSam \
+    -I /dev/stdin \
+    -O alignment/$FO.srt.bam.tmp \
+    -SO coordinate
 
 echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Mark duplicates\033[0m"
 if [[ -e alignment/$FO.markdup.bam ]]
@@ -56,7 +56,7 @@ if [[ -e alignment/$FO.markdup.bam ]]
         -O alignment/$FO.markdup.bam.merged
     rm alignment/$FO.markdup.bam
     rm alignment/$FO.markdup.bai
-    mv alignment/$FO.markdup.bam.merge alignment/$FO.markdup.bam
+    mv alignment/$FO.markdup.bam.merged alignment/$FO.markdup.bam
 else
     gatk MarkDuplicates \
         -I alignment/$FO.srt.bam.tmp \

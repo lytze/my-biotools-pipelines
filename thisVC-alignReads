@@ -12,9 +12,9 @@ i=$((i-1))
 ID=${FQ1:0:i}
 RGI="@RG\tID:$ID\tLB:NONE\tPL:ILLUMINA\tPU:NONE\tSM:$FO"
 
-if [[ ! -d alignment ]]
+if [[ ! -e alignment ]]
     then
-    mkdir alignment
+    mkdir -p alignment
 fi
 
 echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Aligning\033[0m"
@@ -25,14 +25,14 @@ case $FT in
             $THIS_GENOME_FI/s_pombe_v2.fa \
             $FQ1 $FQ2 |
         samtools view -@ $TR -Sb |
-        samtools sort -@ $TR -o alignment/$FO.srt.bam.tmp ;;
+        samtools sort -@ $TR -n -o alignment/$FO.nsrt.bam.tmp ;;
     gz | fq.gz | fastq.gz )
         bwa mem -t $TR \
             -M -R $RGI \
             $THIS_GENOME_FI/s_pombe_v2.fa \
             <( gunzip -c $FQ1 ) <( gunzip -c $FQ2 ) |
         samtools view -@ $TR -Sb |
-        samtools sort -@ $TR -o alignment/$FO.srt.bam.tmp ;;
+        samtools sort -@ $TR -n -o alignment/$FO.nsrt.bam.tmp ;;
     * )
         echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Want file type marked as fq or gz, but not\033[0m"
         exit 1
@@ -40,25 +40,17 @@ case $FT in
 esac
 
 echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Mark duplicates\033[0m"
+samtools fixmate -@ $TR -m alignment/$FO.nsrt.bam.tmp - |
+    samtools sort -@ $TR -o alignment/$FO.msmc.bam.tmp
 if [[ -e alignment/$FO.markdup.bam ]]
     then
-    gatk MarkDuplicates \
-        -I alignment/$FO.srt.bam.tmp \
-        -O alignment/$FO.markdup.bam.tmp \
-        -M /dev/null \
-        --READ_NAME_REGEX null \
-        -AS true --REMOVE_DUPLICATES true
-    samtools merge -@ $TR alignment/$FO.markdup.bam.merge \
-        alignment/$FO.markdup.bam alignment/$FO.markdup.bam.tmp
+    samtools markdup -@ $TR -s alignment/$FO.msmc.bam.tmp alignment/$FO.markdup.bam.tmp
+    samtools merge -@ $TR alignment/$FO.markdup.bam.merged alignment/$FO.markdup.bam alignment/$FO.markdup.bam.tmp
     rm alignment/$FO.markdup.bam
-    mv alignment/$FO.markdup.bam.merge alignment/$FO.markdup.bam
+    rm alignment/$FO.markdup.bai
+    mv alignment/$FO.markdup.bam.merged alignment/$FO.markdup.bam
 else
-    gatk MarkDuplicates \
-        -I alignment/$FO.srt.bam.tmp \
-        -O alignment/$FO.markdup.bam \
-        -M /dev/null \
-        --READ_NAME_REGEX null \
-        -AS true --REMOVE_DUPLICATES true
+    samtools markdup -@ $TR -s alignment/$FO.msmc.bam.tmp alignment/$FO.markdup.bam
 fi
 rm alignment/*.tmp
 

@@ -1,0 +1,22 @@
+#!/bin/bash
+set -e
+
+TR=$1
+FT=$2
+DA=$3
+IN=$4
+FO=$5
+QC=$6
+
+for line in `grep "^$FO" $IN | cut -f2,3 --output-delimiter ";"`
+do
+    F1=`echo $line | cut -f1 -d";"`
+    F2=`echo $line | cut -f2 -d";"`
+    thisVC-alignReads $FT $DA/$F1 $DA/$F2 $FO $TR
+done
+thisVC-bootBQSR $FO $TR
+thisVC-callVariants $FO $TR
+if $QC ; then
+    thisVC-variantQC.R $FO
+fi
+thisVC-filterVariants $FO;

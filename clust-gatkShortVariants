@@ -5,7 +5,7 @@ set -e
 if [ $# -eq 0 ] || [ $1 = "-h" ] || [ $1 = "--help" ] ; then
     echo -e \
 "Arguments < formmat: -flag [type] Intro (defalt value) >
-    -p [INT]        Thread number (alinger / gatk process) (4)
+    -p [INT]        Thread number (aligner) (4)
     -t [fq|gz]      Input file type (gz)
     -i [PATH/DIR]   PATH to input data directory (./data)
     -I [FILE]       PATH to input information list (./input-info)
@@ -51,40 +51,11 @@ elif [[ ! -f $IN ]] ; then
     exit 1
 fi
 
-## MAKE FIFO QUEUE
-mkfifo q.pip && exec 99<> q.pip && rm -f q.pip
-for ((i=0; i<$((($TR+1)/2)); i++))
-do
-    echo >&99
+## SUBMIT JOBS TO LSF
+for FO in `cut -f1 input-info | sort | uniq` ; do
+    bsub -J $FO \
+        -o $FO.run.log -e $FO.msg.log \
+        -q normal -n $TR -R "span[ptile=$TR]" \
+        "clust-unit-gatkShortVariants $TR $FT $DA $IN $FO $QC"
+    sleep 0.5
 done
-
-## ALIGN AND RECORD OUTPUT PREFIXS / SAMPLE NAMES
-FO_ALL=""
-iter=1
-for i in `cat input-info` ; do
-    if [[ iter -eq 1 ]] ; then
-        F2=$i
-        iter=2
-    elif [[ iter -eq 2 ]] ; then
-        F1=$i
-        iter=3
-    elif [[ iter -eq 3 ]] ; then
-        FO=$i
-        FO_ALL="$FO_ALL $FO"
-        iter=1
-        thisVC-alignReads $FT $DA/$F1 $DA/$F2 $FO $TR
-    fi
-done
-## REST ANALYSIS RUN IN PARALLEL
-for i in $FO_ALL
-do
-    read -u 99
-    {
-        thisVC-bootBQSR $i $TR;
-        thisVC-callVariants $i $TR;
-        if $QC ; then thisVC-variantQC.R $i ; fi ;
-        thisVC-filterVariants $i;
-        echo 1>&99
-    }&
-done
-wait
