@@ -52,7 +52,7 @@ if [[ -e alignment/$FO.markdup.bam ]]
 else
     samtools markdup -@ $TR -s alignment/$FO.msmc.bam.tmp alignment/$FO.markdup.bam
 fi
-rm alignment/*.tmp
+rm alignment/$FO.msmc.bam.tmp
 
 echo -e "\033[1m[ `date +%H:%M:%S` $FO ] Indexing\033[0m"
 samtools index -@ $TR alignment/$FO.markdup.bam
